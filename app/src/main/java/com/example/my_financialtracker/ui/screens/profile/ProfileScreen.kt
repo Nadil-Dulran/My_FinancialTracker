@@ -7,17 +7,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.my_financialtracker.R
 import com.example.my_financialtracker.ui.components.AppScaffold
+import com.example.my_financialtracker.ui.components.FrostedBadge
+import com.example.my_financialtracker.ui.components.GradientHeroCard
+import com.example.my_financialtracker.ui.components.MetricCard
 import com.example.my_financialtracker.ui.state.ProfileUiState
 
 @Composable
@@ -26,13 +33,18 @@ fun ProfileScreen(
     onOpenSettings: () -> Unit,
     onOpenNotificationAccess: () -> Unit,
     onSignOut: () -> Unit,
-    onBack: () -> Unit,
+    onAddIncomeClick: () -> Unit,
+    onAddExpenseClick: () -> Unit,
+    onBottomNavClick: (String) -> Unit,
+    currentRoute: String,
 ) {
     AppScaffold(
         title = stringResource(R.string.profile_title),
-        currentRoute = null,
-        showBottomBar = false,
-        onBottomNavClick = {},
+        currentRoute = currentRoute,
+        showBottomBar = true,
+        onBottomNavClick = onBottomNavClick,
+        onAddIncomeClick = onAddIncomeClick,
+        onAddExpenseClick = onAddExpenseClick,
     ) { modifier ->
         Column(
             modifier = modifier
@@ -40,46 +52,67 @@ fun ProfileScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Card {
+            GradientHeroCard(
+                eyebrow = "PROFILE",
+                title = uiState.displayName,
+                amount = uiState.preferredCurrency,
+                subtitle = uiState.email,
+                modifier = Modifier.fillMaxWidth(),
+                accent = {
+                    FrostedBadge(
+                        text = "Account",
+                        icon = Icons.Outlined.Person,
+                    )
+                },
+            )
+
+            MetricCard(
+                title = "Notification Access",
+                amount = if (uiState.notificationCaptureEnabled) "Enabled" else "Disabled",
+                description = if (uiState.notificationCaptureEnabled) {
+                    stringResource(R.string.profile_notifications_enabled)
+                } else {
+                    stringResource(R.string.profile_notifications_disabled)
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Card(
+                shape = MaterialTheme.shapes.large,
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(18.dp),
+                        .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = stringResource(R.string.profile_account_heading),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4F46E5),
                     )
-                    Text(uiState.displayName, style = MaterialTheme.typography.titleLarge)
-                    Text(uiState.email, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         text = stringResource(R.string.profile_preferred_currency, uiState.preferredCurrency),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = if (uiState.notificationCaptureEnabled) {
-                            stringResource(R.string.profile_notifications_enabled)
-                        } else {
-                            stringResource(R.string.profile_notifications_disabled)
-                        },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
-            Card {
+            Card(
+                shape = MaterialTheme.shapes.large,
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(18.dp),
+                        .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
                         text = stringResource(R.string.profile_how_it_works_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4F46E5),
                     )
                     Text(
                         text = stringResource(R.string.profile_how_it_works_intro),
@@ -101,9 +134,6 @@ fun ProfileScreen(
             }
             Button(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.profile_sign_out))
-            }
-            Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.button_back))
             }
         }
     }

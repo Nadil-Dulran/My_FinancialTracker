@@ -23,6 +23,13 @@ class TransactionsViewModel(
 ) : ViewModel() {
     private val localRepository = repository as? LocalFinanceRepository
 
+    init {
+        viewModelScope.launch {
+            runCatching { localRepository?.cleanupLegacyDemoData() }
+                .onFailure { _message.value = it.message ?: "Could not clean old demo records." }
+        }
+    }
+
     val transactions: StateFlow<List<TransactionItem>> = repository.observeRecentTransactions()
         .stateIn(
             scope = viewModelScope,

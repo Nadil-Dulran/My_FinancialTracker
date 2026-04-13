@@ -17,12 +17,19 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class DashboardViewModel(
     repository: FinanceRepository = AppContainer.financeRepository,
     goalRepository: GoalRepository = AppContainer.goalRepository,
 ) : ViewModel() {
     private val localRepository = repository as? LocalFinanceRepository
+
+    init {
+        viewModelScope.launch {
+            runCatching { goalRepository.refreshGoalContributionsIfNeeded() }
+        }
+    }
 
     private data class DashboardBundle(
         val summary: List<SummaryCard>,

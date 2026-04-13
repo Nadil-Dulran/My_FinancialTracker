@@ -65,6 +65,14 @@ class FirestoreSyncService(
             .await()
     }
 
+    suspend fun deleteGoal(userId: String, goalId: String) {
+        userCollection(userId)
+            .collection(COLLECTION_GOALS)
+            .document(goalId)
+            .delete()
+            .await()
+    }
+
     private suspend fun syncIncome(userId: String) {
         val collection = userCollection(userId).collection(COLLECTION_INCOME)
         val remote = collection.get().await().documents.mapNotNull { doc ->

@@ -166,6 +166,8 @@ fun FinancialTrackerNavHost(navController: NavHostController) {
                 onUpdateTransaction = viewModel::updateTransaction,
                 onDeleteTransaction = viewModel::deleteTransaction,
                 onConsumeMessage = viewModel::consumeMessage,
+                onAddIncomeClick = { navController.navigate(AppDestination.AddIncome.route) },
+                onAddExpenseClick = { navController.navigate(AppDestination.AddExpense.route) },
                 onBottomNavClick = { route ->
                     navController.navigate(route) {
                         launchSingleTop = true
@@ -181,7 +183,11 @@ fun FinancialTrackerNavHost(navController: NavHostController) {
             GoalScreen(
                 uiState = uiState,
                 onAddGoal = viewModel::addGoal,
+                onUpdateGoal = viewModel::updateGoal,
+                onDeleteGoal = viewModel::deleteGoal,
                 onEmergencyWithdraw = viewModel::applyEmergencyWithdrawal,
+                onAddIncomeClick = { navController.navigate(AppDestination.AddIncome.route) },
+                onAddExpenseClick = { navController.navigate(AppDestination.AddExpense.route) },
                 onBottomNavClick = { route ->
                     navController.navigate(route) {
                         launchSingleTop = true
@@ -217,7 +223,14 @@ fun FinancialTrackerNavHost(navController: NavHostController) {
                         popUpTo(0) { inclusive = true }
                     }
                 },
-                onBack = { navController.popBackStack() },
+                onAddIncomeClick = { navController.navigate(AppDestination.AddIncome.route) },
+                onAddExpenseClick = { navController.navigate(AppDestination.AddExpense.route) },
+                onBottomNavClick = { route ->
+                    navController.navigate(route) {
+                        launchSingleTop = true
+                    }
+                },
+                currentRoute = AppDestination.Profile.route,
             )
         }
     }

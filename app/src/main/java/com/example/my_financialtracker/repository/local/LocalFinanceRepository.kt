@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import java.util.Calendar
 import java.util.UUID
+import kotlin.math.abs
 import kotlin.math.max
 
 class LocalFinanceRepository(
@@ -308,6 +309,17 @@ class LocalFinanceRepository(
         // New users should start from zero with no seeded finance data.
     }
 
+    suspend fun cleanupLegacyDemoData() {
+        val userId = authSessionManager.currentUserValue?.uid ?: return
+        val legacyExpenses = expenseDao.getAll(userId).filter(::isLegacyDemoExpense)
+        if (legacyExpenses.isEmpty()) return
+
+        legacyExpenses.forEach { expense ->
+            expenseDao.delete(expense)
+            runCatching { syncService.deleteExpense(userId, expense.id) }
+        }
+    }
+
     override suspend fun addIncome(
         sourceType: String,
         amount: Double,
@@ -401,6 +413,7 @@ class LocalFinanceRepository(
 
     override suspend fun refreshRecurringExpensesIfNeeded() {
         val userId = authSessionManager.currentUserValue?.uid ?: return
+        cleanupLegacyDemoData()
         val allExpenses = expenseDao.getAll(userId)
         val templates = allExpenses.filter { it.isRecurringTemplate && it.recurrenceType != "None" }
         val generated = mutableListOf<ExpenseEntity>()
@@ -588,5 +601,14 @@ class LocalFinanceRepository(
         val rateToLkr = rates[preferredCurrency.uppercase()] ?: 1.0
         val converted = CurrencyConverter.fromLkr(amountLkr, rateToLkr)
         return CurrencyConverter.format(converted, preferredCurrency)
+    }
+
+    private fun isLegacyDemoExpense(expense: ExpenseEntity): Boolean {
+        val matchesRentProfile = expense.category.equals("Rent", ignoreCase = true) &&
+            expense.spendingType.equals("Committed", ignoreCase = true) &&
+            expense.paymentMethod.equals("Bank transfer", ignoreCase = true) &&
+            expense.note.equals("Monthly rent", ignoreCase = true)
+        val matchesAmount = abs(expense.originalAmount - 34_000.0) < 0.01
+        return matchesRentProfile && matchesAmount
     }
 }

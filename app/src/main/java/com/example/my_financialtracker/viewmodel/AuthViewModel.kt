@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.my_financialtracker.data.AppContainer
 import com.example.my_financialtracker.model.AppDefaults
 import com.example.my_financialtracker.repository.AuthRepository
+import com.example.my_financialtracker.repository.local.LocalFinanceRepository
 import com.example.my_financialtracker.ui.state.AuthUiState
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,7 @@ class AuthViewModel(
     }
 
     private val syncService = AppContainer.firestoreSyncService
+    private val localFinanceRepository = AppContainer.financeRepository as? LocalFinanceRepository
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
@@ -44,6 +46,8 @@ class AuthViewModel(
                 .onSuccess { user ->
                     runCatching { syncService.syncUserData(user.uid) }
                         .onFailure { Log.w(TAG, "Initial sync after login failed", it) }
+                    runCatching { localFinanceRepository?.cleanupLegacyDemoData() }
+                        .onFailure { Log.w(TAG, "Legacy data cleanup after login failed", it) }
                     _uiState.update { current -> current.copy(isLoading = false) }
                     onSuccess()
                 }
@@ -66,6 +70,8 @@ class AuthViewModel(
                 .onSuccess { user ->
                     runCatching { syncService.syncUserData(user.uid) }
                         .onFailure { Log.w(TAG, "Initial sync after registration failed", it) }
+                    runCatching { localFinanceRepository?.cleanupLegacyDemoData() }
+                        .onFailure { Log.w(TAG, "Legacy data cleanup after registration failed", it) }
                     _uiState.update { current -> current.copy(isLoading = false) }
                     onSuccess()
                 }

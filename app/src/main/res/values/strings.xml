@@ -1,9 +1,12 @@
 <resources>
     <string name="app_name">FlowLedger</string>
     <string name="nav_home">Home</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_add">Add</string>
     <string name="nav_expense">Expense</string>
     <string name="nav_history">History</string>
     <string name="nav_goal">Goal</string>
+    <string name="nav_profile">Profile</string>
     <string name="dashboard_title">Dashboard</string>
     <string name="dashboard_snapshot_title">Money overview</string>
     <string name="dashboard_currency_chip">Display currency ready</string>

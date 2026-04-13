@@ -1,6 +1,7 @@
 package com.example.my_financialtracker.data.local.dao
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -29,4 +30,7 @@ interface GoalDao {
 
     @Query("SELECT * FROM goals WHERE id = :goalId AND userId = :userId LIMIT 1")
     suspend fun getGoalById(goalId: String, userId: String): GoalEntity?
+
+    @Delete
+    suspend fun delete(goal: GoalEntity)
 }

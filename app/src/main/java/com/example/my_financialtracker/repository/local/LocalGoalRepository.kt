@@ -87,6 +87,38 @@ class LocalGoalRepository(
         runCatching { syncService.pushGoal(userId, goal) }
     }
 
+    override suspend fun updateGoal(
+        goalId: String,
+        title: String,
+        targetAmount: Double,
+        currentSaved: Double,
+        monthsToDeadline: Int,
+        monthlyContribution: Double,
+        contributionDayOfMonth: Int,
+        allowEmergencyUse: Boolean,
+    ): Result<Unit> = runCatching {
+        val userId = authSessionManager.currentUserValue?.uid ?: error("No signed-in user.")
+        val existing = goalDao.getGoalById(goalId, userId) ?: error("Goal not found.")
+        val updated = existing.copy(
+            title = title.trim(),
+            targetAmountLkr = targetAmount,
+            currentSavedLkr = currentSaved,
+            monthlyContributionLkr = monthlyContribution.coerceAtLeast(0.0),
+            contributionDayOfMonth = contributionDayOfMonth.coerceIn(1, 28),
+            allowEmergencyUse = allowEmergencyUse,
+            deadlineAt = monthsFromNow(monthsToDeadline),
+        )
+        goalDao.upsert(updated)
+        runCatching { syncService.pushGoal(userId, updated) }
+    }
+
+    override suspend fun deleteGoal(goalId: String): Result<Unit> = runCatching {
+        val userId = authSessionManager.currentUserValue?.uid ?: error("No signed-in user.")
+        val goal = goalDao.getGoalById(goalId, userId) ?: error("Goal not found.")
+        goalDao.delete(goal)
+        runCatching { syncService.deleteGoal(userId, goalId) }
+    }
+
     override suspend fun applyEmergencyWithdrawal(goalId: String, amount: Double): Result<Unit> = runCatching {
         val userId = authSessionManager.currentUserValue?.uid ?: error("No signed-in user.")
         val goal = goalDao.getGoalById(goalId, userId) ?: error("Goal not found.")
@@ -131,6 +163,18 @@ class LocalGoalRepository(
         // Goals should start empty so users can define their own saving plans.
     }
 
+    suspend fun cleanupLegacyDemoGoals() {
+        val userId = authSessionManager.currentUserValue?.uid ?: return
+        val legacyGoals = goalDao.getAllGoals(userId).filter { goal ->
+            val title = goal.title.lowercase()
+            title.contains("mac") || title.contains("m4")
+        }
+        legacyGoals.forEach { goal ->
+            goalDao.delete(goal)
+            runCatching { syncService.deleteGoal(userId, goal.id) }
+        }
+    }
+
     private fun GoalEntity.toOverview(
         preferredCurrency: String,
         rates: Map<String, Double>,
@@ -155,6 +199,12 @@ class LocalGoalRepository(
             } else {
                 "No emergency withdrawals yet"
             },
+            targetAmountLkr = targetAmountLkr,
+            currentSavedLkr = currentSavedLkr,
+            monthlyContributionLkr = monthlyContributionLkr,
+            contributionDayOfMonth = contributionDayOfMonth,
+            monthsRemaining = monthsRemaining,
+            allowEmergencyUse = allowEmergencyUse,
             progress = progress,
             isCompleted = remainingLkr <= 0.0,
         )

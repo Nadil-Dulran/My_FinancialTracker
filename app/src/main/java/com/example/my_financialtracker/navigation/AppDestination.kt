@@ -1,9 +1,10 @@
 package com.example.my_financialtracker.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AddCard
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -25,18 +26,25 @@ data class BottomNavItem(
     val route: String,
     @StringRes val labelRes: Int,
     val icon: ImageVector,
+    val isAddAction: Boolean = false,
 )
 
 val bottomNavItems = listOf(
     BottomNavItem(
         route = AppDestination.Dashboard.route,
-        labelRes = R.string.nav_home,
+        labelRes = R.string.nav_dashboard,
         icon = Icons.Outlined.Home,
     ),
     BottomNavItem(
-        route = AppDestination.AddExpense.route,
-        labelRes = R.string.nav_expense,
-        icon = Icons.Outlined.AddCard,
+        route = AppDestination.Goal.route,
+        labelRes = R.string.nav_goal,
+        icon = Icons.Outlined.Flag,
+    ),
+    BottomNavItem(
+        route = "add_menu",
+        labelRes = R.string.nav_add,
+        icon = Icons.Outlined.Add,
+        isAddAction = true,
     ),
     BottomNavItem(
         route = AppDestination.Transactions.route,
@@ -44,8 +52,8 @@ val bottomNavItems = listOf(
         icon = Icons.Outlined.ReceiptLong,
     ),
     BottomNavItem(
-        route = AppDestination.Goal.route,
-        labelRes = R.string.nav_goal,
-        icon = Icons.Outlined.Flag,
+        route = AppDestination.Profile.route,
+        labelRes = R.string.nav_profile,
+        icon = Icons.Outlined.Person,
     ),
 )

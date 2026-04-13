@@ -36,10 +36,8 @@ object AppContainer {
         if (!deferredStartupScheduled.compareAndSet(false, true)) return
 
         applicationScope.launch {
-            runCatching { financeRepository.seedDemoDataIfNeeded() }
             runCatching { financeRepository.refreshRecurringExpensesIfNeeded() }
             runCatching { goalRepository.refreshGoalContributionsIfNeeded() }
-            runCatching { goalRepository.seedDemoGoalIfNeeded() }
             runCatching { exchangeRateRepository.refreshRatesIfNeeded() }
         }
     }

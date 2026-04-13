@@ -32,6 +32,12 @@ data class GoalOverview(
     val contributionScheduleLabel: String,
     val emergencyUseLabel: String,
     val emergencyUsedLabel: String,
+    val targetAmountLkr: Double,
+    val currentSavedLkr: Double,
+    val monthlyContributionLkr: Double,
+    val contributionDayOfMonth: Int,
+    val monthsRemaining: Int,
+    val allowEmergencyUse: Boolean,
     val progress: Float,
     val isCompleted: Boolean,
 )
