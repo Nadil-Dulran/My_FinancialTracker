@@ -4,4 +4,5 @@ data class ProfileUiState(
     val displayName: String = "User",
     val email: String = "",
     val preferredCurrency: String = "LKR",
+    val notificationCaptureEnabled: Boolean = false,
 )

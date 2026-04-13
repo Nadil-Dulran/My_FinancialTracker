@@ -24,6 +24,7 @@ import com.example.my_financialtracker.ui.state.ProfileUiState
 fun ProfileScreen(
     uiState: ProfileUiState,
     onOpenSettings: () -> Unit,
+    onOpenNotificationAccess: () -> Unit,
     onSignOut: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -57,6 +58,14 @@ fun ProfileScreen(
                         text = stringResource(R.string.profile_preferred_currency, uiState.preferredCurrency),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text(
+                        text = if (uiState.notificationCaptureEnabled) {
+                            stringResource(R.string.profile_notifications_enabled)
+                        } else {
+                            stringResource(R.string.profile_notifications_disabled)
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
@@ -84,6 +93,9 @@ fun ProfileScreen(
                 }
             }
 
+            Button(onClick = onOpenNotificationAccess, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.profile_notification_access))
+            }
             Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.profile_open_settings))
             }

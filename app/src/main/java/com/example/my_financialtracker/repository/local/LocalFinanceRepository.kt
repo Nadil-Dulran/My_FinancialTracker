@@ -2,8 +2,12 @@ package com.example.my_financialtracker.repository.local
 
 import com.example.my_financialtracker.data.currency.CurrencyConverter
 import com.example.my_financialtracker.data.currency.ExchangeRateRepository
+import com.example.my_financialtracker.data.local.dao.DetectedTransactionDao
 import com.example.my_financialtracker.data.local.dao.ExpenseDao
+import com.example.my_financialtracker.data.local.dao.GoalDao
 import com.example.my_financialtracker.data.local.dao.IncomeDao
+import com.example.my_financialtracker.data.notification.NotificationTransactionParser
+import com.example.my_financialtracker.model.DetectedTransactionItem
 import com.example.my_financialtracker.data.local.entity.ExpenseEntity
 import com.example.my_financialtracker.data.local.entity.IncomeEntity
 import com.example.my_financialtracker.data.preferences.UserPreferencesRepository
@@ -24,6 +28,8 @@ import kotlin.math.max
 class LocalFinanceRepository(
     private val incomeDao: IncomeDao,
     private val expenseDao: ExpenseDao,
+    private val goalDao: GoalDao,
+    private val detectedTransactionDao: DetectedTransactionDao,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val exchangeRateRepository: ExchangeRateRepository,
     private val firebaseAuth: FirebaseAuth,
@@ -34,13 +40,15 @@ class LocalFinanceRepository(
         return combine(
             incomeDao.observeAll(),
             expenseDao.observeAll(),
+            goalDao.observeAllGoals(),
             userPreferencesRepository.preferredCurrency,
             exchangeRateRepository.ratesToLkr,
-        ) { incomes, expenses, preferredCurrency, rates ->
+        ) { incomes, expenses, goals, preferredCurrency, rates ->
             val actualExpenses = expenses.filterNot { it.isRecurringTemplate }
             val incomeTotal = incomes.sumOf { it.amountLkr }
             val expenseTotal = actualExpenses.sumOf { it.amountLkr }
-            val available = incomeTotal - expenseTotal
+            val reservedTotal = goals.sumOf { it.currentSavedLkr }
+            val available = incomeTotal - expenseTotal - reservedTotal
 
             listOf(
                 SummaryCard(
@@ -56,7 +64,7 @@ class LocalFinanceRepository(
                 SummaryCard(
                     title = "Estimated free cash",
                     amountLabel = formatDisplayCurrency(max(available, 0.0), preferredCurrency, rates),
-                    description = "Remaining amount after current recorded spending",
+                    description = "Remaining amount after expenses and goal reserves",
                 ),
             )
         }
@@ -123,16 +131,19 @@ class LocalFinanceRepository(
         return combine(
             incomeDao.observeAll(),
             expenseDao.observeAll(),
+            goalDao.observeAllGoals(),
             userPreferencesRepository.preferredCurrency,
             exchangeRateRepository.ratesToLkr,
-        ) { incomes, expenses, preferredCurrency, rates ->
+        ) { incomes, expenses, goals, preferredCurrency, rates ->
             val actualExpenses = expenses.filterNot { it.isRecurringTemplate }
             val spent = actualExpenses.sumOf { it.amountLkr }
+            val reserved = goals.sumOf { it.currentSavedLkr }
             val income = incomes.sumOf { it.amountLkr }
-            val left = max(income - spent, 0.0)
+            val left = max(income - spent - reserved, 0.0)
 
             listOf(
                 ChartDatum("Spent", spent, formatDisplayCurrency(spent, preferredCurrency, rates)),
+                ChartDatum("Reserved", reserved, formatDisplayCurrency(reserved, preferredCurrency, rates)),
                 ChartDatum("Left", left, formatDisplayCurrency(left, preferredCurrency, rates)),
             )
         }
@@ -142,18 +153,20 @@ class LocalFinanceRepository(
         return combine(
             incomeDao.observeAll(),
             expenseDao.observeAll(),
+            goalDao.observeAllGoals(),
             userPreferencesRepository.preferredCurrency,
             exchangeRateRepository.ratesToLkr,
-        ) { incomes, expenses, preferredCurrency, rates ->
+        ) { incomes, expenses, goals, preferredCurrency, rates ->
             val actualExpenses = expenses.filterNot { it.isRecurringTemplate }
             val spent = actualExpenses.sumOf { it.amountLkr }
+            val reserved = goals.sumOf { it.currentSavedLkr }
             val income = incomes.sumOf { it.amountLkr }
-            val left = income - spent
+            val left = income - spent - reserved
 
             if (left >= 0.0) {
-                "You've spent ${formatDisplayCurrency(spent, preferredCurrency, rates)} and still have ${formatDisplayCurrency(left, preferredCurrency, rates)} left from recorded income."
+                "You've spent ${formatDisplayCurrency(spent, preferredCurrency, rates)}, reserved ${formatDisplayCurrency(reserved, preferredCurrency, rates)} for goals, and still have ${formatDisplayCurrency(left, preferredCurrency, rates)} left."
             } else {
-                "You've spent ${formatDisplayCurrency(spent, preferredCurrency, rates)}, which is ${formatDisplayCurrency(kotlin.math.abs(left), preferredCurrency, rates)} over recorded income."
+                "You've spent ${formatDisplayCurrency(spent, preferredCurrency, rates)} and reserved ${formatDisplayCurrency(reserved, preferredCurrency, rates)}, which puts you ${formatDisplayCurrency(kotlin.math.abs(left), preferredCurrency, rates)} over recorded income."
             }
         }
     }
@@ -201,9 +214,10 @@ class LocalFinanceRepository(
         return combine(
             incomeDao.observeAll(),
             expenseDao.observeAll(),
+            goalDao.observeAllGoals(),
             userPreferencesRepository.preferredCurrency,
             exchangeRateRepository.ratesToLkr,
-        ) { incomes, expenses, preferredCurrency, rates ->
+        ) { incomes, expenses, goals, preferredCurrency, rates ->
             val mappedIncome = incomes.map {
                 TransactionItem(
                     id = it.id,
@@ -232,15 +246,51 @@ class LocalFinanceRepository(
                     note = it.note,
                 )
             }
+            val mappedGoalTransfers = goals.filter { it.lastContributionAt > 0L && it.monthlyContributionLkr > 0.0 }.map {
+                TransactionItem(
+                    id = "goal_transfer_${it.id}",
+                    type = TransactionType.GOAL_TRANSFER,
+                    title = "${it.title} reserve",
+                    amountLabel = "- ${formatDisplayCurrency(it.monthlyContributionLkr, preferredCurrency, rates)}",
+                    meta = "Auto-saved on day ${it.contributionDayOfMonth} from ${it.contributionSource}",
+                    originalAmount = it.monthlyContributionLkr,
+                    originalCurrency = preferredCurrency,
+                    note = "Reserved automatically for this goal.",
+                )
+            }
 
-            (mappedIncome + mappedExpenses)
+            (mappedIncome + mappedExpenses + mappedGoalTransfers)
                 .sortedByDescending { item ->
                     when (item.type) {
                         TransactionType.INCOME -> incomes.firstOrNull { it.id == item.id }?.receivedAt ?: 0L
                         TransactionType.EXPENSE -> expenses.firstOrNull { it.id == item.id }?.spentAt ?: 0L
+                        TransactionType.GOAL_TRANSFER -> goals.firstOrNull { "goal_transfer_${it.id}" == item.id }?.lastContributionAt ?: 0L
                     }
                 }
                 .take(20)
+        }
+    }
+
+    override fun observeDetectedTransactions(): Flow<List<DetectedTransactionItem>> {
+        return combine(
+            detectedTransactionDao.observePending(),
+            userPreferencesRepository.preferredCurrency,
+            exchangeRateRepository.ratesToLkr,
+        ) { items, preferredCurrency, rates ->
+            items.map {
+                DetectedTransactionItem(
+                    id = it.id,
+                    title = it.title,
+                    amountLabel = formatDisplayCurrency(it.amountLkr, preferredCurrency, rates),
+                    merchant = it.merchant,
+                    detectedType = it.detectedType,
+                    suggestedCategoryOrSource = it.suggestedCategoryOrSource,
+                    rawText = it.rawText,
+                    currency = it.currency,
+                    amountOriginal = it.amountOriginal,
+                    occurredAt = it.occurredAt,
+                )
+            }
         }
     }
 
@@ -475,6 +525,67 @@ class LocalFinanceRepository(
         }
     }
 
+    override suspend fun ingestDetectedTransaction(
+        packageName: String,
+        title: String,
+        body: String,
+        postedAt: Long,
+    ) {
+        val rates = userPreferencesRepository.getCachedRates()
+        val parsed = NotificationTransactionParser.parse(
+            packageName = packageName,
+            title = title,
+            text = body,
+            postedAt = postedAt,
+        ) { amount, currency ->
+            val rateToLkr = (rates[currency.uppercase()] ?: rates["LKR"] ?: 1.0)
+            CurrencyConverter.toLkr(amount, currency, rateToLkr)
+        } ?: return
+        detectedTransactionDao.upsert(parsed)
+    }
+
+    override suspend fun confirmDetectedTransaction(
+        id: String,
+        chosenType: String,
+        chosenCategoryOrSource: String,
+        chosenSpendingType: String,
+        note: String,
+    ): Result<Unit> = runCatching {
+        val detected = detectedTransactionDao.getById(id) ?: error("Detected transaction not found.")
+        if (chosenType == "INCOME") {
+            addIncome(
+                sourceType = chosenCategoryOrSource,
+                amount = detected.amountOriginal,
+                currency = detected.currency,
+                note = buildString {
+                    append("Verified from bank notification")
+                    if (note.isNotBlank()) append(": $note")
+                },
+            ).getOrThrow()
+        } else {
+            addExpense(
+                category = chosenCategoryOrSource,
+                amount = detected.amountOriginal,
+                currency = detected.currency,
+                spendingType = chosenSpendingType,
+                recurrenceType = "None",
+                paymentMethod = "Card",
+                accountName = "Detected from bank alert",
+                note = buildString {
+                    append("Verified from bank notification")
+                    if (detected.merchant.isNotBlank()) append(" at ${detected.merchant}")
+                    if (note.isNotBlank()) append(": $note")
+                },
+            ).getOrThrow()
+        }
+        detectedTransactionDao.upsert(detected.copy(status = "CONFIRMED"))
+    }
+
+    override suspend fun ignoreDetectedTransaction(id: String): Result<Unit> = runCatching {
+        val detected = detectedTransactionDao.getById(id) ?: error("Detected transaction not found.")
+        detectedTransactionDao.upsert(detected.copy(status = "IGNORED"))
+    }
+
     override suspend fun updateTransaction(transaction: TransactionItem): Result<Unit> = runCatching {
         when (transaction.type) {
             TransactionType.INCOME -> {
@@ -506,6 +617,7 @@ class LocalFinanceRepository(
                 expenseDao.upsert(updated)
                 firebaseAuth.currentUser?.uid?.let { uid -> syncService.pushExpense(uid, updated) }
             }
+            TransactionType.GOAL_TRANSFER -> error("Automatic goal reserve entries cannot be edited here.")
         }
     }
 
@@ -521,6 +633,7 @@ class LocalFinanceRepository(
                 expenseDao.delete(existing)
                 firebaseAuth.currentUser?.uid?.let { uid -> syncService.deleteExpense(uid, transaction.id) }
             }
+            TransactionType.GOAL_TRANSFER -> error("Automatic goal reserve entries cannot be deleted here.")
         }
     }
 

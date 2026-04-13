@@ -26,4 +26,7 @@ interface GoalDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(goals: List<GoalEntity>)
+
+    @Query("SELECT * FROM goals WHERE id = :goalId LIMIT 1")
+    suspend fun getGoalById(goalId: String): GoalEntity?
 }

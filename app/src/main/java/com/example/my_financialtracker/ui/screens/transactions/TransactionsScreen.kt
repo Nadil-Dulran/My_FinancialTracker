@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.my_financialtracker.R
 import com.example.my_financialtracker.model.AppDefaults
+import com.example.my_financialtracker.model.DetectedTransactionItem
 import com.example.my_financialtracker.model.InsightItem
 import com.example.my_financialtracker.model.TransactionItem
 import com.example.my_financialtracker.model.TransactionType
@@ -42,9 +43,12 @@ import com.example.my_financialtracker.ui.components.DropdownField
 @Composable
 fun TransactionsScreen(
     transactions: List<TransactionItem>,
+    detectedTransactions: List<DetectedTransactionItem>,
     insights: List<InsightItem>,
     spendingStatus: String,
     message: String?,
+    onConfirmDetectedTransaction: (String, String, String, String, String) -> Unit,
+    onIgnoreDetectedTransaction: (String) -> Unit,
     onUpdateTransaction: (TransactionItem) -> Unit,
     onDeleteTransaction: (TransactionItem) -> Unit,
     onConsumeMessage: () -> Unit,
@@ -52,6 +56,7 @@ fun TransactionsScreen(
     currentRoute: String,
 ) {
     var editingTransaction by remember { mutableStateOf<TransactionItem?>(null) }
+    var confirmingDetected by remember { mutableStateOf<DetectedTransactionItem?>(null) }
 
     LaunchedEffect(message) {
         if (message != null) onConsumeMessage()
@@ -79,6 +84,50 @@ fun TransactionsScreen(
                             text = it,
                             color = MaterialTheme.colorScheme.primary,
                         )
+                    }
+                }
+            }
+
+            if (detectedTransactions.isNotEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(R.string.history_detected_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+
+            items(detectedTransactions) { item ->
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                    ),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(item.title, fontWeight = FontWeight.SemiBold)
+                        Text(item.amountLabel)
+                        Text(
+                            text = "${item.detectedType} · ${item.suggestedCategoryOrSource}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (item.merchant.isNotBlank()) {
+                            Text(item.merchant, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text(item.rawText, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(onClick = { confirmingDetected = item }) {
+                                Text(stringResource(R.string.button_confirm))
+                            }
+                            TextButton(onClick = { onIgnoreDetectedTransaction(item.id) }) {
+                                Text(stringResource(R.string.button_ignore))
+                            }
+                        }
                     }
                 }
             }
@@ -157,12 +206,14 @@ fun TransactionsScreen(
                         if (item.note.isNotBlank()) {
                             Text(item.note, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = { editingTransaction = item }) {
-                                Text(stringResource(R.string.button_edit))
-                            }
-                            TextButton(onClick = { onDeleteTransaction(item) }) {
-                                Text(stringResource(R.string.button_delete))
+                        if (item.type != TransactionType.GOAL_TRANSFER) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Button(onClick = { editingTransaction = item }) {
+                                    Text(stringResource(R.string.button_edit))
+                                }
+                                TextButton(onClick = { onDeleteTransaction(item) }) {
+                                    Text(stringResource(R.string.button_delete))
+                                }
                             }
                         }
                     }
@@ -178,6 +229,23 @@ fun TransactionsScreen(
             onSave = {
                 onUpdateTransaction(it)
                 editingTransaction = null
+            },
+        )
+    }
+
+    confirmingDetected?.let { detected ->
+        ConfirmDetectedTransactionDialog(
+            item = detected,
+            onDismiss = { confirmingDetected = null },
+            onConfirm = { chosenType, chosenCategoryOrSource, chosenSpendingType, note ->
+                onConfirmDetectedTransaction(
+                    detected.id,
+                    chosenType,
+                    chosenCategoryOrSource,
+                    chosenSpendingType,
+                    note,
+                )
+                confirmingDetected = null
             },
         )
     }
@@ -261,6 +329,70 @@ private fun EditTransactionDialog(
                 },
             ) {
                 Text(stringResource(R.string.button_save))
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text(stringResource(R.string.button_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun ConfirmDetectedTransactionDialog(
+    item: DetectedTransactionItem,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String, String) -> Unit,
+) {
+    var chosenType by remember(item.id) { mutableStateOf(item.detectedType) }
+    var categoryOrSource by remember(item.id) { mutableStateOf(item.suggestedCategoryOrSource) }
+    var spendingType by remember(item.id) { mutableStateOf(AppDefaults.DEFAULT_SPENDING_TYPE) }
+    var note by remember(item.id) { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.history_confirm_detected_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                DropdownField(
+                    label = stringResource(R.string.history_detected_type_field),
+                    value = chosenType,
+                    options = listOf("EXPENSE", "INCOME"),
+                    onValueSelected = {
+                        chosenType = it
+                        categoryOrSource = if (it == "INCOME") incomeSources.first() else expenseCategories.first()
+                    },
+                )
+                DropdownField(
+                    label = if (chosenType == "INCOME") {
+                        stringResource(R.string.field_source)
+                    } else {
+                        stringResource(R.string.field_category)
+                    },
+                    value = categoryOrSource,
+                    options = if (chosenType == "INCOME") incomeSources else expenseCategories,
+                    onValueSelected = { categoryOrSource = it },
+                )
+                if (chosenType == "EXPENSE") {
+                    DropdownField(
+                        label = stringResource(R.string.field_spending_type),
+                        value = spendingType,
+                        options = spendingTypes,
+                        onValueSelected = { spendingType = it },
+                    )
+                }
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text(stringResource(R.string.field_note)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(chosenType, categoryOrSource, spendingType, note) }) {
+                Text(stringResource(R.string.button_confirm))
             }
         },
         dismissButton = {

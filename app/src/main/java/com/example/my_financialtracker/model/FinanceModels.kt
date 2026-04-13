@@ -28,6 +28,10 @@ data class GoalOverview(
     val remainingAmountLabel: String,
     val deadlineLabel: String,
     val monthlyNeedLabel: String,
+    val monthlyContributionLabel: String,
+    val contributionScheduleLabel: String,
+    val emergencyUseLabel: String,
+    val emergencyUsedLabel: String,
     val progress: Float,
     val isCompleted: Boolean,
 )
@@ -35,6 +39,7 @@ data class GoalOverview(
 enum class TransactionType {
     INCOME,
     EXPENSE,
+    GOAL_TRANSFER,
 }
 
 data class ChartDatum(

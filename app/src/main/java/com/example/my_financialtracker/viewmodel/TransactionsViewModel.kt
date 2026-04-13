@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.my_financialtracker.data.AppContainer
 import com.example.my_financialtracker.model.AppDefaults
+import com.example.my_financialtracker.model.DetectedTransactionItem
 import com.example.my_financialtracker.model.InsightItem
 import com.example.my_financialtracker.model.TransactionItem
 import com.example.my_financialtracker.repository.FinanceRepository
@@ -23,6 +24,13 @@ class TransactionsViewModel(
     private val localRepository = repository as? LocalFinanceRepository
 
     val transactions: StateFlow<List<TransactionItem>> = repository.observeRecentTransactions()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
+
+    val detectedTransactions: StateFlow<List<DetectedTransactionItem>> = repository.observeDetectedTransactions()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
@@ -64,5 +72,35 @@ class TransactionsViewModel(
 
     fun consumeMessage() {
         _message.update { null }
+    }
+
+    fun confirmDetectedTransaction(
+        id: String,
+        chosenType: String,
+        chosenCategoryOrSource: String,
+        chosenSpendingType: String,
+        note: String,
+    ) {
+        viewModelScope.launch {
+            repository.confirmDetectedTransaction(
+                id = id,
+                chosenType = chosenType,
+                chosenCategoryOrSource = chosenCategoryOrSource,
+                chosenSpendingType = chosenSpendingType,
+                note = note,
+            ).onSuccess {
+                _message.value = "Detected transaction confirmed."
+            }.onFailure {
+                _message.value = it.message ?: "Could not confirm detected transaction."
+            }
+        }
+    }
+
+    fun ignoreDetectedTransaction(id: String) {
+        viewModelScope.launch {
+            repository.ignoreDetectedTransaction(id)
+                .onSuccess { _message.value = "Detected transaction ignored." }
+                .onFailure { _message.value = it.message ?: "Could not ignore detected transaction." }
+        }
     }
 }

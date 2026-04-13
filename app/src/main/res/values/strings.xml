@@ -42,6 +42,9 @@
     <string name="transactions_title">Recent History</string>
     <string name="transactions_copy">Edit or delete saved entries whenever plans change or records need correction.</string>
     <string name="history_copy">Keep transaction history and finance notes together in one place.</string>
+    <string name="history_detected_title">Detected bank alerts</string>
+    <string name="history_confirm_detected_title">Confirm detected transaction</string>
+    <string name="history_detected_type_field">Detected type</string>
     <string name="history_insights_title">Recent insights</string>
     <string name="history_recent_transactions_title">Recent transactions</string>
     <string name="edit_transaction_title">Edit Transaction</string>
@@ -56,11 +59,14 @@
     <string name="field_category">Category</string>
     <string name="field_spending_type">Spending Type</string>
     <string name="field_payment_method">Payment Method</string>
+    <string name="password_toggle">Toggle password visibility</string>
     <string name="button_sign_in">Sign In</string>
     <string name="button_create_account">Create Account</string>
     <string name="button_back_to_sign_in">Back to Sign In</string>
     <string name="button_back">Back</string>
     <string name="button_save">Save</string>
+    <string name="button_confirm">Confirm</string>
+    <string name="button_ignore">Ignore</string>
     <string name="button_cancel">Cancel</string>
     <string name="button_edit">Edit</string>
     <string name="button_delete">Delete</string>
@@ -80,6 +86,9 @@
     <string name="profile_title">Profile</string>
     <string name="profile_account_heading">Account overview</string>
     <string name="profile_preferred_currency">Preferred currency: %1$s</string>
+    <string name="profile_notification_access">Notification Access</string>
+    <string name="profile_notifications_enabled">Bank notification capture is enabled.</string>
+    <string name="profile_notifications_disabled">Bank notification capture is not enabled yet.</string>
     <string name="profile_how_it_works_title">How It Works</string>
     <string name="profile_how_it_works_intro">FlowLedger keeps the app simple for day-to-day use while still showing useful finance signals.</string>
     <string name="profile_how_it_works_step_1">1. Add income in the original currency you received it in.</string>
@@ -95,5 +104,14 @@
     <string name="goal_current_saved_label">Current saved</string>
     <string name="goal_target_amount_label">Target amount</string>
     <string name="goal_new_goal_title">New Goal</string>
+    <string name="goal_empty_title">No goals yet</string>
+    <string name="goal_empty_copy">Create your own goal plan and the app will track progress, monthly auto-saving, and emergency use for you.</string>
+    <string name="goal_monthly_transfer">Monthly auto-save: %1$s</string>
+    <string name="goal_monthly_transfer_field">Monthly amount from salary</string>
+    <string name="goal_transfer_day_field">Transfer day of month (1-28)</string>
+    <string name="goal_allow_emergency_use">Allow emergency withdrawals from this goal</string>
+    <string name="goal_emergency_withdraw">Emergency Withdraw</string>
+    <string name="goal_emergency_withdraw_copy">Use this only when the goal savings need to be pulled back for a real emergency.</string>
+    <string name="goal_emergency_amount_field">Emergency amount</string>
     <string name="field_recurrence">Recurrence</string>
 </resources>

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.util.Calendar
 import java.util.UUID
+import kotlin.math.abs
 import kotlin.math.max
 
 class LocalGoalRepository(
@@ -48,12 +49,21 @@ class LocalGoalRepository(
         targetAmount: Double,
         currentSaved: Double,
         monthsToDeadline: Int,
+        monthlyContribution: Double,
+        contributionDayOfMonth: Int,
+        allowEmergencyUse: Boolean,
     ): Result<Unit> = runCatching {
         val goal = GoalEntity(
             id = "goal_${UUID.randomUUID()}",
             title = title.trim(),
             targetAmountLkr = targetAmount,
             currentSavedLkr = currentSaved,
+            monthlyContributionLkr = monthlyContribution.coerceAtLeast(0.0),
+            contributionDayOfMonth = contributionDayOfMonth.coerceIn(1, 28),
+            contributionSource = "Salary",
+            allowEmergencyUse = allowEmergencyUse,
+            emergencyUsedLkr = 0.0,
+            lastContributionAt = 0L,
             deadlineAt = monthsFromNow(monthsToDeadline),
             createdAt = System.currentTimeMillis(),
         )
@@ -61,29 +71,46 @@ class LocalGoalRepository(
         firebaseAuth.currentUser?.uid?.let { uid -> syncService.pushGoal(uid, goal) }
     }
 
-    override suspend fun seedDemoGoalIfNeeded() {
-        if (goalDao.getAllGoals().isNotEmpty()) return
+    override suspend fun applyEmergencyWithdrawal(goalId: String, amount: Double): Result<Unit> = runCatching {
+        val goal = goalDao.getGoalById(goalId) ?: error("Goal not found.")
+        require(goal.allowEmergencyUse) { "Emergency use is disabled for this goal." }
+        require(amount > 0.0) { "Enter a valid withdrawal amount." }
 
-        goalDao.upsertAll(
-            listOf(
-                GoalEntity(
-                    id = "goal_macbook",
-                    title = "MacBook Pro Fund",
-                    targetAmountLkr = 490000.0,
-                    currentSavedLkr = 11200.0,
-                    deadlineAt = monthsFromNow(12),
-                    createdAt = System.currentTimeMillis(),
-                ),
-                GoalEntity(
-                    id = "goal_emergency",
-                    title = "Emergency Buffer",
-                    targetAmountLkr = 150000.0,
-                    currentSavedLkr = 25000.0,
-                    deadlineAt = monthsFromNow(8),
-                    createdAt = System.currentTimeMillis(),
-                ),
-            ),
+        val updated = goal.copy(
+            currentSavedLkr = max(goal.currentSavedLkr - amount, 0.0),
+            emergencyUsedLkr = goal.emergencyUsedLkr + amount,
         )
+        goalDao.upsert(updated)
+        firebaseAuth.currentUser?.uid?.let { uid -> syncService.pushGoal(uid, updated) }
+    }
+
+    override suspend fun refreshGoalContributionsIfNeeded() {
+        val now = Calendar.getInstance()
+        val goals = goalDao.getAllGoals()
+        goals.forEach { goal ->
+            if (goal.monthlyContributionLkr <= 0.0) return@forEach
+            val lastContributionMonth = goal.lastContributionAt.takeIf { it > 0L }?.let {
+                Calendar.getInstance().apply { timeInMillis = it }
+            }
+
+            val alreadyContributedThisMonth = lastContributionMonth?.let {
+                it.get(Calendar.YEAR) == now.get(Calendar.YEAR) &&
+                    it.get(Calendar.MONTH) == now.get(Calendar.MONTH)
+            } ?: false
+
+            if (!alreadyContributedThisMonth && now.get(Calendar.DAY_OF_MONTH) >= goal.contributionDayOfMonth) {
+                val updated = goal.copy(
+                    currentSavedLkr = goal.currentSavedLkr + goal.monthlyContributionLkr,
+                    lastContributionAt = now.timeInMillis,
+                )
+                goalDao.upsert(updated)
+                firebaseAuth.currentUser?.uid?.let { uid -> syncService.pushGoal(uid, updated) }
+            }
+        }
+    }
+
+    override suspend fun seedDemoGoalIfNeeded() {
+        // Goals should start empty so users can define their own saving plans.
     }
 
     private fun GoalEntity.toOverview(
@@ -102,6 +129,14 @@ class LocalGoalRepository(
             remainingAmountLabel = formatDisplayCurrency(remainingLkr, preferredCurrency, rates),
             deadlineLabel = "$monthsRemaining months remaining",
             monthlyNeedLabel = "Need about ${formatDisplayCurrency(remainingLkr / monthsRemaining, preferredCurrency, rates)} per month",
+            monthlyContributionLabel = formatDisplayCurrency(monthlyContributionLkr, preferredCurrency, rates),
+            contributionScheduleLabel = "Auto-save on day $contributionDayOfMonth from $contributionSource",
+            emergencyUseLabel = if (allowEmergencyUse) "Emergency use is allowed" else "Emergency use is locked",
+            emergencyUsedLabel = if (emergencyUsedLkr > 0.0) {
+                "Emergency use so far: ${formatDisplayCurrency(emergencyUsedLkr, preferredCurrency, rates)}"
+            } else {
+                "No emergency withdrawals yet"
+            },
             progress = progress,
             isCompleted = remainingLkr <= 0.0,
         )

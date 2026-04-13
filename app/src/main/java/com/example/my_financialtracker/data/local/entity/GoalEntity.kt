@@ -9,6 +9,12 @@ data class GoalEntity(
     val title: String,
     val targetAmountLkr: Double,
     val currentSavedLkr: Double,
+    val monthlyContributionLkr: Double,
+    val contributionDayOfMonth: Int,
+    val contributionSource: String,
+    val allowEmergencyUse: Boolean,
+    val emergencyUsedLkr: Double,
+    val lastContributionAt: Long,
     val deadlineAt: Long,
     val createdAt: Long,
 )

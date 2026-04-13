@@ -21,7 +21,8 @@ import kotlinx.coroutines.launch
 import com.google.firebase.firestore.FirebaseFirestore
 
 object AppContainer {
-    private lateinit var appContext: Context
+    lateinit var appContext: Context
+        private set
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun initialize(application: Application) {
@@ -29,6 +30,7 @@ object AppContainer {
         applicationScope.launch {
             financeRepository.seedDemoDataIfNeeded()
             financeRepository.refreshRecurringExpensesIfNeeded()
+            goalRepository.refreshGoalContributionsIfNeeded()
             goalRepository.seedDemoGoalIfNeeded()
             exchangeRateRepository.refreshRatesIfNeeded()
         }
@@ -52,6 +54,8 @@ object AppContainer {
         LocalFinanceRepository(
             incomeDao = database.incomeDao(),
             expenseDao = database.expenseDao(),
+            goalDao = database.goalDao(),
+            detectedTransactionDao = database.detectedTransactionDao(),
             userPreferencesRepository = userPreferencesRepository,
             exchangeRateRepository = exchangeRateRepository,
             firebaseAuth = firebaseAuth,

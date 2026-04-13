@@ -1,6 +1,9 @@
 package com.example.my_financialtracker.navigation
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -148,14 +151,18 @@ fun FinancialTrackerNavHost(navController: NavHostController) {
         composable(AppDestination.Transactions.route) {
             val viewModel: TransactionsViewModel = viewModel()
             val transactions = viewModel.transactions.collectAsStateWithLifecycle().value
+            val detectedTransactions = viewModel.detectedTransactions.collectAsStateWithLifecycle().value
             val insights = viewModel.insights.collectAsStateWithLifecycle().value
             val spendingStatus = viewModel.spendingStatus.collectAsStateWithLifecycle().value
             val message = viewModel.message.collectAsStateWithLifecycle().value
             TransactionsScreen(
                 transactions = transactions,
+                detectedTransactions = detectedTransactions,
                 insights = insights,
                 spendingStatus = spendingStatus,
                 message = message,
+                onConfirmDetectedTransaction = viewModel::confirmDetectedTransaction,
+                onIgnoreDetectedTransaction = viewModel::ignoreDetectedTransaction,
                 onUpdateTransaction = viewModel::updateTransaction,
                 onDeleteTransaction = viewModel::deleteTransaction,
                 onConsumeMessage = viewModel::consumeMessage,
@@ -174,6 +181,7 @@ fun FinancialTrackerNavHost(navController: NavHostController) {
             GoalScreen(
                 uiState = uiState,
                 onAddGoal = viewModel::addGoal,
+                onEmergencyWithdraw = viewModel::applyEmergencyWithdrawal,
                 onBottomNavClick = { route ->
                     navController.navigate(route) {
                         launchSingleTop = true
@@ -196,9 +204,13 @@ fun FinancialTrackerNavHost(navController: NavHostController) {
         composable(AppDestination.Profile.route) {
             val viewModel: ProfileViewModel = viewModel()
             val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
+            val context = LocalContext.current
             ProfileScreen(
                 uiState = uiState,
                 onOpenSettings = { navController.navigate(AppDestination.Settings.route) },
+                onOpenNotificationAccess = {
+                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                },
                 onSignOut = {
                     viewModel.signOut()
                     navController.navigate(AppDestination.Login.route) {

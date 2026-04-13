@@ -11,6 +11,11 @@ interface GoalRepository {
         targetAmount: Double,
         currentSaved: Double,
         monthsToDeadline: Int,
+        monthlyContribution: Double,
+        contributionDayOfMonth: Int,
+        allowEmergencyUse: Boolean,
     ): Result<Unit>
+    suspend fun applyEmergencyWithdrawal(goalId: String, amount: Double): Result<Unit>
+    suspend fun refreshGoalContributionsIfNeeded()
     suspend fun seedDemoGoalIfNeeded()
 }
